@@ -26,6 +26,7 @@ package com.oracle.svm.configure.config;
 
 import java.io.IOException;
 import java.util.Comparator;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.regex.Pattern;
@@ -56,13 +57,24 @@ public class ResourceConfiguration implements ConfigurationBase {
 
         @Override
         public void addResourceBundles(String name) {
-            configuration.addBundle(name);
+            // TODO extent the API
+            configuration.addBundle("todo", name, "TODO");
+        }
+    }
+
+    public static class BundleConfiguration {
+        public final String baseName;
+        public final Set<String> locales = ConcurrentHashMap.newKeySet();
+        public final Set<String> classNames = ConcurrentHashMap.newKeySet();
+
+        public BundleConfiguration(String baseName) {
+            this.baseName = baseName;
         }
     }
 
     private final ConcurrentMap<String, Pattern> addedResources = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, Pattern> ignoredResources = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap.KeySetView<String, Boolean> bundles = ConcurrentHashMap.newKeySet();
+    private final ConcurrentHashMap<String, BundleConfiguration> bundles = new ConcurrentHashMap<>();
 
     public ResourceConfiguration() {
     }
@@ -70,13 +82,15 @@ public class ResourceConfiguration implements ConfigurationBase {
     public ResourceConfiguration(ResourceConfiguration other) {
         addedResources.putAll(other.addedResources);
         ignoredResources.putAll(other.ignoredResources);
-        bundles.addAll(other.bundles);
+        bundles.putAll(other.bundles);
     }
 
     public void removeAll(ResourceConfiguration other) {
         addedResources.keySet().removeAll(other.addedResources.keySet());
         ignoredResources.keySet().removeAll(other.ignoredResources.keySet());
-        bundles.removeAll(other.bundles);
+        for (String key : other.bundles.keySet()) {
+            bundles.remove(key);
+        }
     }
 
     public void addResourcePattern(String pattern) {
@@ -87,8 +101,14 @@ public class ResourceConfiguration implements ConfigurationBase {
         ignoredResources.computeIfAbsent(pattern, Pattern::compile);
     }
 
-    public void addBundle(String bundle) {
-        bundles.add(bundle);
+    public void addBundle(String className, String baseName, String localeTag) {
+        BundleConfiguration config = bundles.get(baseName);
+        if (config == null) {
+            config = new BundleConfiguration(baseName);
+            bundles.put(baseName, config);
+        }
+        config.locales.add(localeTag);
+        config.classNames.add(className);
     }
 
     public boolean anyResourceMatches(String s) {
@@ -126,8 +146,16 @@ public class ResourceConfiguration implements ConfigurationBase {
         }
         writer.append('}').append(',').newline();
         writer.quote("bundles").append(':');
-        JsonPrinter.printCollection(writer, bundles, Comparator.naturalOrder(), (String p, JsonWriter w) -> w.append('{').quote("name").append(':').quote(p).append('}'));
+        JsonPrinter.printCollection(writer, bundles.keySet(), Comparator.naturalOrder(), (String p, JsonWriter w) -> printResourceBundle(bundles.get(p), w));
         writer.unindent().newline().append('}');
+    }
+
+    private void printResourceBundle(BundleConfiguration config, JsonWriter writer) throws IOException {
+        writer.append('{').quote("name").append(':').quote(config.baseName).append(',').quote("localeTags").append(":");
+        JsonPrinter.printCollection(writer, config.locales, Comparator.naturalOrder(), (String p, JsonWriter w) -> w.quote(p));
+        writer.append(',').quote("classNames").append(":");
+        JsonPrinter.printCollection(writer, config.classNames, Comparator.naturalOrder(), (String p, JsonWriter w) -> w.quote(p));
+        writer.append('}');
     }
 
     @Override
