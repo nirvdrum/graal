@@ -40,7 +40,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.IllformedLocaleException;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -83,9 +82,12 @@ import com.oracle.svm.util.ReflectionUtil;
 import jdk.vm.ci.meta.ResolvedJavaField;
 import jdk.vm.ci.meta.ResolvedJavaMethod;
 import jdk.vm.ci.meta.ResolvedJavaType;
+import org.graalvm.nativeimage.hosted.RuntimeReflection;
 import sun.util.locale.provider.LocaleProviderAdapter;
 import sun.util.locale.provider.ResourceBundleBasedAdapter;
 import sun.util.resources.LocaleData;
+
+import static com.oracle.svm.core.jdk.localization.LocalizationSupport.parseLocaleFromTag;
 // Checkstyle: resume
 
 /**
@@ -265,29 +267,6 @@ public abstract class LocalizationFeature implements Feature {
         }
     }
 
-    /**
-     * @return locale for given tag or null for invalid ones
-     */
-    @Platforms(Platform.HOSTED_ONLY.class)
-    private static Locale parseLocaleFromTag(String tag) {
-        try {
-            return new Locale.Builder().setLanguageTag(tag).build();
-        } catch (IllformedLocaleException ex) {
-            /*- Custom made locales consisting of at most three parts separated by '-' are also supported */
-            String[] parts = tag.split("-");
-            switch (parts.length) {
-                case 1:
-                    return new Locale(parts[0]);
-                case 2:
-                    return new Locale(parts[0], parts[1]);
-                case 3:
-                    return new Locale(parts[0], parts[1], parts[2]);
-                default:
-                    return null;
-            }
-        }
-    }
-
     @Platforms(Platform.HOSTED_ONLY.class)
     private static Set<Locale> processLocalesOption() {
         Set<Locale> locales = new HashSet<>();
@@ -297,7 +276,7 @@ public abstract class LocalizationFeature implements Feature {
         }
         List<String> invalid = new ArrayList<>();
         for (String tag : OptionUtils.flatten(",", Options.IncludeLocales.getValue().values())) {
-            Locale locale = parseLocaleFromTag(tag);
+            Locale locale = LocalizationSupport.parseLocaleFromTag(tag);
             if (locale != null) {
                 locales.add(locale);
             } else {
@@ -441,6 +420,14 @@ public abstract class LocalizationFeature implements Feature {
         /*- Get rid of locale specific suffix. */
         String baseName = input.substring(0, splitIndex);
         prepareBundle(baseName, Collections.singletonList(locale));
+    }
+
+    @Platforms(Platform.HOSTED_ONLY.class)
+    public void addClassBasedResourceBundle(String className) {
+        // todo is this the proper way of loading the class? probably not...
+        Class<?> bundleClass = findClassByName.apply(className);
+        RuntimeReflection.register(bundleClass);
+        RuntimeReflection.registerForReflectiveInstantiation(bundleClass);
     }
 
     @Platforms(Platform.HOSTED_ONLY.class)

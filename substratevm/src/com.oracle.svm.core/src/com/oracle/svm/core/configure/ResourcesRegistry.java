@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -24,10 +24,17 @@
  */
 package com.oracle.svm.core.configure;
 
+import java.util.Collection;
+import java.util.Locale;
+
 public interface ResourcesRegistry {
     void addResources(String pattern);
 
     void ignoreResources(String pattern);
 
     void addResourceBundles(String name);
+
+    void addClassBasedResourceBundle(String className);
+
+    void addResourceBundles(String basename, Collection<Locale> locales);
 }

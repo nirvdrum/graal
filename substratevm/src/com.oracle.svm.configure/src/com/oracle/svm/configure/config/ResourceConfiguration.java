@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -25,9 +25,10 @@
 package com.oracle.svm.configure.config;
 
 import java.io.IOException;
-import java.util.Collections;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -61,10 +62,28 @@ public class ResourceConfiguration implements ConfigurationBase {
         }
 
         @Override
-        public void addResourceBundles(String name) {
-            // TODO extent the API
-            configuration.addBundle(Collections.emptyList(), name, "TODO");
+        public void addResourceBundles(String baseName) {
+            configuration.addBundle(baseName);
         }
+
+        @Override
+        public void addClassBasedResourceBundle(String className) {
+            configuration.addClassBasedResourceBundle(className);
+        }
+
+        @Override
+        public void addResourceBundles(String basename, Collection<Locale> locales) {
+            configuration.addBundle(basename, locales);
+        }
+    }
+
+    private void addClassBasedResourceBundle(String className) {
+        String baseName = className;
+        int split = baseName.lastIndexOf('_');
+        if (split != -1) {
+            baseName = baseName.substring(0, split);
+        }
+        getOrCreateBundleConfig(baseName).classNames.add(className);
     }
 
     public static class BundleConfiguration {
@@ -106,12 +125,19 @@ public class ResourceConfiguration implements ConfigurationBase {
         ignoredResources.computeIfAbsent(pattern, Pattern::compile);
     }
 
-    public void addBundle(List<Pair<String, String>> bundleInfo, String baseName, String queriedLocaleTag) {
-        BundleConfiguration config = bundles.get(baseName);
-        if (config == null) {
-            config = new BundleConfiguration(baseName);
-            bundles.put(baseName, config);
+    private void addBundle(String basename, Collection<Locale> locales) {
+        BundleConfiguration config = getOrCreateBundleConfig(basename);
+        for (Locale locale : locales) {
+            config.locales.add(locale.toLanguageTag());
         }
+    }
+
+    private void addBundle(String baseName) {
+        getOrCreateBundleConfig(baseName);
+    }
+
+    public void addBundle(List<Pair<String, String>> bundleInfo, String baseName) {
+        BundleConfiguration config = getOrCreateBundleConfig(baseName);
         for (Pair<String, String> pair : bundleInfo) {
             String className = pair.getLeft();
             String localeTag = pair.getRight();
@@ -121,6 +147,10 @@ public class ResourceConfiguration implements ConfigurationBase {
                 config.locales.add(localeTag);
             }
         }
+    }
+
+    private BundleConfiguration getOrCreateBundleConfig(String baseName) {
+        return bundles.computeIfAbsent(baseName, key -> new BundleConfiguration(baseName));
     }
 
     public boolean anyResourceMatches(String s) {
@@ -142,6 +172,7 @@ public class ResourceConfiguration implements ConfigurationBase {
     }
 
     public boolean anyBundleMatches(String s) {
+        // todo fix the check
         return bundles.contains(s);
     }
 

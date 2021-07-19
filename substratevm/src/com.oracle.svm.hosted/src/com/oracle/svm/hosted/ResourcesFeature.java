@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -35,6 +35,7 @@ import java.net.URLClassLoader;
 import java.nio.file.FileSystem;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Enumeration;
@@ -42,6 +43,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -138,6 +140,16 @@ public final class ResourcesFeature implements Feature {
         @Override
         public void addResourceBundles(String name) {
             ImageSingletons.lookup(LocalizationFeature.class).prepareBundle(name);
+        }
+
+        @Override
+        public void addClassBasedResourceBundle(String className) {
+            ImageSingletons.lookup(LocalizationFeature.class).addClassBasedResourceBundle(className);
+        }
+
+        @Override
+        public void addResourceBundles(String basename, Collection<Locale> locales) {
+            ImageSingletons.lookup(LocalizationFeature.class).prepareBundle(basename, locales);
         }
     }
 
