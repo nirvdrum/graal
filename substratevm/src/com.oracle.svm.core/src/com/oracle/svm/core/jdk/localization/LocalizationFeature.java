@@ -449,7 +449,7 @@ public abstract class LocalizationFeature implements Feature {
             } catch (MissingResourceException mre) {
                 continue;
             }
-            somethingFound = !resourceBundle.isEmpty();
+            somethingFound |= !resourceBundle.isEmpty();
             for (ResourceBundle bundle : resourceBundle) {
                 prepareBundle(baseName, bundle, locale);
             }
