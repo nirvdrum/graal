@@ -172,8 +172,7 @@ public class ResourceConfiguration implements ConfigurationBase {
     }
 
     public boolean anyBundleMatches(String s) {
-        // todo fix the check
-        return bundles.contains(s);
+        return bundles.containsKey(s);
     }
 
     @Override
