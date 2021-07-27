@@ -171,7 +171,7 @@ public abstract class LocalizationFeature implements Feature {
         public static final HostedOptionKey<Boolean> LocalizationCompressInParallel = new HostedOptionKey<>(true);
 
         @Option(help = "When enabled, localization feature details are printed.", type = OptionType.Debug)//
-        public static final HostedOptionKey<Boolean> TraceLocalizationFeature = new HostedOptionKey<>(false);
+        public static final HostedOptionKey<Boolean> TraceLocalizationFeature = new HostedOptionKey<>(true);
     }
 
     /**
@@ -426,6 +426,7 @@ public abstract class LocalizationFeature implements Feature {
     public void addClassBasedResourceBundle(String className) {
         // todo is this the proper way of loading the class? probably not...
         Class<?> bundleClass = findClassByName.apply(className);
+        trace("Adding class based resource bundle: " + className);
         RuntimeReflection.register(bundleClass);
         RuntimeReflection.registerForReflectiveInstantiation(bundleClass);
     }
