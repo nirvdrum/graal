@@ -113,8 +113,8 @@ public abstract class XMLParsersRegistration extends JNIRegistrationUtil {
             classInitializationSupport.setConfigurationSealed(false);
 
             ResourcesRegistry resourcesRegistry = ImageSingletons.lookup(ResourcesRegistry.class);
-            resourcesRegistry.addResourceBundles("com.sun.org.apache.xml.internal.serializer.utils.SerializerMessages");
-            resourcesRegistry.addResourceBundles("com.sun.org.apache.xalan.internal.xsltc.compiler.util.ErrorMessages");
+            resourcesRegistry.addResourceBundle("com.sun.org.apache.xml.internal.serializer.utils.SerializerMessages");
+            resourcesRegistry.addResourceBundle("com.sun.org.apache.xalan.internal.xsltc.compiler.util.ErrorMessages");
             resourcesRegistry.addResources("com.sun.*.properties");
 
             classInitializationSupport.setConfigurationSealed(true);
