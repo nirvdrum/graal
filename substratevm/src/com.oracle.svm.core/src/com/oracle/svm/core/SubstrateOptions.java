@@ -605,4 +605,8 @@ public class SubstrateOptions {
             return 4096;
         }
     }
+
+    @APIOption(name = "configure-reflection-metadata")//
+    @Option(help = "Limit method reflection metadata to configuration entries instead of including it for all reachable methods")//
+    public static final HostedOptionKey<Boolean> ConfigureReflectionMetadata = new HostedOptionKey<>(true);
 }
