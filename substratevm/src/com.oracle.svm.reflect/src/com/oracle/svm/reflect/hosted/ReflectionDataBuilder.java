@@ -45,6 +45,7 @@ import org.graalvm.nativeimage.hosted.Feature.DuringAnalysisAccess;
 import org.graalvm.nativeimage.impl.ConfigurationCondition;
 import org.graalvm.nativeimage.impl.RuntimeReflectionSupport;
 
+import com.oracle.graal.pointsto.meta.AnalysisMethod;
 import com.oracle.graal.pointsto.meta.AnalysisType;
 import com.oracle.svm.core.SubstrateOptions;
 import com.oracle.svm.core.hub.ClassForNameSupport;
@@ -210,6 +211,17 @@ public class ReflectionDataBuilder extends ConditionalConfigurationRegistry impl
                 }
             }
         }
+
+        for (AnalysisMethod method : access.getUniverse().getMethods()) {
+            if (method.isReachable() && method.hasJavaMethod()) {
+                /*
+                 * Reflection signature parsing will try to instantiate classes via Class.forName().
+                 */
+                for (Class<?> paramType : method.getJavaMethod().getParameterTypes()) {
+                    ClassForNameSupport.registerClass(paramType);
+                }
+            }
+        }
     }
 
     private void processRegisteredElements(DuringAnalysisAccessImpl access) {
@@ -289,6 +301,13 @@ public class ReflectionDataBuilder extends ConditionalConfigurationRegistry impl
                             buildRecordComponents(clazz, access));
         }
         hub.setReflectionData(reflectionData);
+
+        if (SubstrateOptions.ConfigureReflectionMetadata.getValue()) {
+            /* Trigger creation of the AnalysisMethod objects needed to store metadata */
+            for (Executable method : queriedMethods) {
+                access.getMetaAccess().lookupJavaMethod(method);
+            }
+        }
     }
 
     private static <T> T query(Callable<T> callable, List<Throwable> errors) {

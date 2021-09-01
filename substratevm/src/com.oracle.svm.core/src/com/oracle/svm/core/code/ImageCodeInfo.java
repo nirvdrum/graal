@@ -61,6 +61,8 @@ public class ImageCodeInfo {
     @UnknownObjectField(types = {byte[].class}) byte[] codeInfoIndex;
     @UnknownObjectField(types = {byte[].class}) byte[] codeInfoEncodings;
     @UnknownObjectField(types = {byte[].class}) byte[] referenceMapEncoding;
+    @UnknownObjectField(types = {byte[].class}) byte[] methodReflectionMetadataEncoding;
+    @UnknownObjectField(types = {byte[].class}) byte[] methodReflectionMetadataIndexEncoding;
     @UnknownObjectField(types = {byte[].class}) byte[] frameInfoEncodings;
     @UnknownObjectField(types = {Object[].class}) Object[] frameInfoObjectConstants;
     @UnknownObjectField(types = {Class[].class}) Class<?>[] frameInfoSourceClasses;
@@ -94,6 +96,8 @@ public class ImageCodeInfo {
         info.setCodeInfoIndex(NonmovableArrays.fromImageHeap(codeInfoIndex));
         info.setCodeInfoEncodings(NonmovableArrays.fromImageHeap(codeInfoEncodings));
         info.setStackReferenceMapEncoding(NonmovableArrays.fromImageHeap(referenceMapEncoding));
+        info.setMethodReflectionMetadataEncoding(NonmovableArrays.fromImageHeap(methodReflectionMetadataEncoding));
+        info.setMethodReflectionMetadataIndexEncoding(NonmovableArrays.fromImageHeap(methodReflectionMetadataIndexEncoding));
         info.setFrameInfoEncodings(NonmovableArrays.fromImageHeap(frameInfoEncodings));
         info.setFrameInfoObjectConstants(NonmovableArrays.fromImageHeap(frameInfoObjectConstants));
         info.setFrameInfoSourceClasses(NonmovableArrays.fromImageHeap(frameInfoSourceClasses));
@@ -148,6 +152,16 @@ public class ImageCodeInfo {
         }
 
         @Override
+        public NonmovableArray<Byte> getMethodReflectionMetadataEncoding() {
+            return NonmovableArrays.fromImageHeap(methodReflectionMetadataEncoding);
+        }
+
+        @Override
+        public NonmovableArray<Byte> getMethodReflectionMetadataIndexEncoding() {
+            return NonmovableArrays.fromImageHeap(methodReflectionMetadataIndexEncoding);
+        }
+
+        @Override
         public void setCodeStart(CodePointer value) {
             codeStart = value;
         }
@@ -195,6 +209,16 @@ public class ImageCodeInfo {
         @Override
         public void setStackReferenceMapEncoding(NonmovableArray<Byte> array) {
             referenceMapEncoding = NonmovableArrays.getHostedArray(array);
+        }
+
+        @Override
+        public void setMethodReflectionMetadataEncoding(NonmovableArray<Byte> array) {
+            methodReflectionMetadataEncoding = NonmovableArrays.getHostedArray(array);
+        }
+
+        @Override
+        public void setMethodReflectionMetadataIndexEncoding(NonmovableArray<Byte> array) {
+            methodReflectionMetadataIndexEncoding = NonmovableArrays.getHostedArray(array);
         }
 
         @Override

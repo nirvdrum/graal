@@ -287,6 +287,8 @@ class CodeInfoFeature implements Feature {
         config.registerAsImmutable(imageInfo.codeInfoIndex);
         config.registerAsImmutable(imageInfo.codeInfoEncodings);
         config.registerAsImmutable(imageInfo.referenceMapEncoding);
+        config.registerAsImmutable(imageInfo.methodReflectionMetadataEncoding);
+        config.registerAsImmutable(imageInfo.methodReflectionMetadataIndexEncoding);
         config.registerAsImmutable(imageInfo.frameInfoEncodings);
         config.registerAsImmutable(imageInfo.frameInfoObjectConstants);
         config.registerAsImmutable(imageInfo.frameInfoSourceClasses);

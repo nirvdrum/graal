@@ -210,6 +210,8 @@ public final class CodeInfoAccess {
                             .add(NonmovableArrays.byteSizeOf(impl.getCodeInfoIndex()))
                             .add(NonmovableArrays.byteSizeOf(impl.getCodeInfoEncodings()))
                             .add(NonmovableArrays.byteSizeOf(impl.getStackReferenceMapEncoding()))
+                            .add(NonmovableArrays.byteSizeOf(impl.getMethodReflectionMetadataEncoding()))
+                            .add(NonmovableArrays.byteSizeOf(impl.getMethodReflectionMetadataIndexEncoding()))
                             .add(NonmovableArrays.byteSizeOf(impl.getFrameInfoEncodings()))
                             .add(NonmovableArrays.byteSizeOf(impl.getFrameInfoObjectConstants()))
                             .add(NonmovableArrays.byteSizeOf(impl.getFrameInfoSourceClasses()))
@@ -280,6 +282,14 @@ public final class CodeInfoAccess {
         return cast(info).getStackReferenceMapEncoding();
     }
 
+    public static NonmovableArray<Byte> getMethodReflectionMetadataEncoding(CodeInfo info) {
+        return cast(info).getMethodReflectionMetadataEncoding();
+    }
+
+    public static NonmovableArray<Byte> getMethodReflectionMetadataIndexEncoding(CodeInfo info) {
+        return cast(info).getMethodReflectionMetadataIndexEncoding();
+    }
+
     public static long lookupStackReferenceMapIndex(CodeInfo info, long ip) {
         return CodeInfoDecoder.lookupStackReferenceMapIndex(info, ip);
     }
@@ -293,14 +303,9 @@ public final class CodeInfoAccess {
     }
 
     @Uninterruptible(reason = "Nonmovable object arrays are not visible to GC until installed.")
-    public static void setFrameInfo(CodeInfo info, NonmovableArray<Byte> encodings, NonmovableObjectArray<Object> objectConstants,
-                    NonmovableObjectArray<Class<?>> sourceClasses, NonmovableObjectArray<String> sourceMethodNames, NonmovableObjectArray<String> names) {
+    public static void setFrameInfo(CodeInfo info, NonmovableArray<Byte> encodings) {
         CodeInfoImpl impl = cast(info);
         impl.setFrameInfoEncodings(encodings);
-        impl.setFrameInfoObjectConstants(objectConstants);
-        impl.setFrameInfoSourceClasses(sourceClasses);
-        impl.setFrameInfoSourceMethodNames(sourceMethodNames);
-        impl.setFrameInfoNames(names);
         if (!SubstrateUtil.HOSTED) {
             // notify the GC about the frame metadata that is now live
             Heap.getHeap().getRuntimeCodeInfoGCSupport().registerFrameMetadata(impl);
@@ -312,6 +317,26 @@ public final class CodeInfoAccess {
         impl.setCodeInfoIndex(index);
         impl.setCodeInfoEncodings(encodings);
         impl.setStackReferenceMapEncoding(referenceMapEncoding);
+    }
+
+    public static void setMethodMetadata(CodeInfo info, NonmovableArray<Byte> methodDataEncoding, NonmovableArray<Byte> methodDataIndexEncoding) {
+        CodeInfoImpl impl = cast(info);
+        impl.setMethodReflectionMetadataEncoding(methodDataEncoding);
+        impl.setMethodReflectionMetadataIndexEncoding(methodDataIndexEncoding);
+    }
+
+    @Uninterruptible(reason = "Nonmovable object arrays are not visible to GC until installed.")
+    public static void setEncodings(CodeInfo info, NonmovableObjectArray<Object> objectConstants,
+                    NonmovableObjectArray<Class<?>> sourceClasses, NonmovableObjectArray<String> sourceMethodNames, NonmovableObjectArray<String> names) {
+        CodeInfoImpl impl = cast(info);
+        impl.setFrameInfoObjectConstants(objectConstants);
+        impl.setFrameInfoSourceClasses(sourceClasses);
+        impl.setFrameInfoSourceMethodNames(sourceMethodNames);
+        impl.setFrameInfoNames(names);
+        if (!SubstrateUtil.HOSTED) {
+            // notify the GC about the frame metadata that is now live
+            Heap.getHeap().getRuntimeCodeInfoGCSupport().registerFrameMetadata(impl);
+        }
     }
 
     public static Log log(CodeInfo info, Log log) {

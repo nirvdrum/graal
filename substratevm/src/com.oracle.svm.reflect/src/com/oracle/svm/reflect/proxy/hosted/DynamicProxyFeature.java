@@ -28,11 +28,11 @@ import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
 
-import com.oracle.svm.core.configure.ConfigurationFile;
 import org.graalvm.nativeimage.ImageSingletons;
 import org.graalvm.nativeimage.hosted.Feature;
 
 import com.oracle.svm.core.annotate.AutomaticFeature;
+import com.oracle.svm.core.configure.ConfigurationFile;
 import com.oracle.svm.core.configure.ConfigurationFiles;
 import com.oracle.svm.core.configure.ProxyConfigurationParser;
 import com.oracle.svm.core.jdk.proxy.DynamicProxyRegistry;
@@ -47,6 +47,7 @@ import com.oracle.svm.reflect.proxy.DynamicProxySupport;
 @AutomaticFeature
 public final class DynamicProxyFeature implements Feature {
     private int loadedConfigurations;
+    private DynamicProxySupport dynamicProxySupport;
 
     @Override
     public List<Class<? extends Feature>> getRequiredFeatures() {
@@ -58,7 +59,7 @@ public final class DynamicProxyFeature implements Feature {
         DuringSetupAccessImpl access = (DuringSetupAccessImpl) a;
 
         ImageClassLoader imageClassLoader = access.getImageClassLoader();
-        DynamicProxySupport dynamicProxySupport = new DynamicProxySupport(imageClassLoader.getClassLoader());
+        dynamicProxySupport = new DynamicProxySupport(imageClassLoader.getClassLoader());
         ImageSingletons.add(DynamicProxyRegistry.class, dynamicProxySupport);
 
         Consumer<String[]> adapter = interfaceNames -> {

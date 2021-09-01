@@ -31,13 +31,14 @@ import java.util.Objects;
 import java.util.stream.Stream;
 
 import org.graalvm.collections.EconomicSet;
-import org.graalvm.nativeimage.hosted.Feature;
 import org.graalvm.nativeimage.ImageSingletons;
+import org.graalvm.nativeimage.hosted.Feature;
 
 import com.oracle.graal.pointsto.meta.AnalysisType;
 import com.oracle.graal.pointsto.meta.AnalysisUniverse;
 import com.oracle.svm.core.annotate.AutomaticFeature;
 import com.oracle.svm.core.hub.AnnotationTypeSupport;
+import com.oracle.svm.core.jdk.proxy.DynamicProxyRegistry;
 import com.oracle.svm.hosted.FeatureImpl.AfterRegistrationAccessImpl;
 import com.oracle.svm.hosted.FeatureImpl.DuringAnalysisAccessImpl;
 
@@ -58,24 +59,39 @@ public class AnnotationTypeFeature implements Feature {
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public void duringAnalysis(DuringAnalysisAccess access) {
         DuringAnalysisAccessImpl accessImpl = (DuringAnalysisAccessImpl) access;
         AnalysisUniverse universe = accessImpl.getUniverse();
 
-        /*
-         * JDK implementation of repeatable annotations always instantiates an array of a requested
-         * annotation. We need to mark arrays of all reachable annotations as in heap.
-         */
         universe.getTypes().stream()
                         .filter(AnalysisType::isAnnotation)
                         .filter(AnalysisType::isReachable)
-                        .map(type -> universe.lookup(type.getWrapped()).getArrayClass())
-                        .filter(annotationArray -> !annotationArray.isInstantiated())
-                        .forEach(annotationArray -> {
-                            accessImpl.registerAsInHeap(annotationArray);
-                            access.requireAnalysisIteration();
-                        });
+                        .map(type -> universe.lookup(type.getWrapped()))
+                        .forEach(annotationType -> {
+                            /*
+                             * JDK implementation of repeatable annotations always instantiates an
+                             * array of a requested annotation. We need to mark arrays of all
+                             * reachable annotations as in heap.
+                             */
+                            AnalysisType annotationArray = annotationType.getArrayClass();
+                            if (!annotationArray.isInstantiated()) {
+                                accessImpl.registerAsInHeap(annotationArray);
+                                access.requireAnalysisIteration();
+                            }
 
+                            /*
+                             * Parsing annotation data in reflection classes requires being able to
+                             * instantiate all annotation types at runtime.
+                             */
+                            try {
+                                Class<? extends Annotation> annotationClass = (Class<? extends Annotation>) annotationType.getJavaClass();
+                                ImageSingletons.lookup(AnnotationTypeSupport.class).createInstance(annotationClass);
+                                ImageSingletons.lookup(DynamicProxyRegistry.class).addProxyClass(annotationClass);
+                            } catch (LinkageError | RuntimeException t) {
+                                // ignore
+                            }
+                        });
         Stream<AnnotatedElement> allElements = Stream.concat(Stream.concat(universe.getFields().stream(), universe.getMethods().stream()), universe.getTypes().stream());
         Stream<AnnotatedElement> newElements = allElements.filter(visitedElements::add);
         newElements.forEach(this::reportAnnotation);
