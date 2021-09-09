@@ -598,39 +598,28 @@ public class SubstrateAArch64Backend extends SubstrateBackend implements LIRGene
 
     protected static class SubstrateAArch64FrameContext implements FrameContext {
 
+        protected final SharedMethod method;
+
+        protected SubstrateAArch64FrameContext(SharedMethod method) {
+            this.method = method;
+        }
+
         @Override
         public void enter(CompilationResultBuilder crb) {
             FrameMap frameMap = crb.frameMap;
             final int frameSize = frameMap.frameSize();
             final int totalFrameSize = frameMap.totalFrameSize();
-            int wordSize = crb.target.arch.getWordSize();
-            assert frameSize + 2 * wordSize == totalFrameSize : "total framesize should be framesize + 2 words";
+            assert frameSize + 2 * crb.target.arch.getWordSize() == totalFrameSize : "totalFramesize should be frameSize + 2 words";
             AArch64MacroAssembler masm = (AArch64MacroAssembler) crb.asm;
-            crb.blockComment("[method prologue]");
 
-            try (ScratchRegister sc = masm.getScratchRegister()) {
-                Register scratch = sc.getRegister();
-                assert totalFrameSize > 0;
-                AArch64Address.AddressingMode addressingMode = AArch64Address.AddressingMode.IMMEDIATE_PAIR_SIGNED_SCALED;
-                if (AArch64Address.isValidImmediateAddress(64, addressingMode, frameSize)) {
-                    masm.sub(64, sp, sp, totalFrameSize);
-                    masm.stp(64, fp, lr, AArch64Address.createImmediateAddress(64, addressingMode, sp, frameSize));
-                    if (((SubstrateAArch64RegisterConfig) frameMap.getRegisterConfig()).shouldPreserveFramePointer()) {
-                        masm.add(64, fp, sp, frameSize);
-                    }
-                } else {
-                    int frameRecordSize = 2 * wordSize;
-                    masm.stp(64, fp, lr, AArch64Address.createImmediateAddress(64, AArch64Address.AddressingMode.IMMEDIATE_PAIR_PRE_INDEXED, sp, -frameRecordSize));
-                    if (((SubstrateAArch64RegisterConfig) frameMap.getRegisterConfig()).shouldPreserveFramePointer()) {
-                        masm.mov(64, fp, sp);
-                    }
-                    masm.sub(64, sp, sp, totalFrameSize - frameRecordSize, scratch);
-                }
-            }
+            crb.blockComment("[method prologue]");
+            makeFrame(crb, masm, totalFrameSize, frameSize);
+            crb.recordMark(PROLOGUE_DECD_RSP);
+
             if (ZapStackOnMethodEntry.getValue(crb.getOptions())) {
                 try (ScratchRegister sc = masm.getScratchRegister()) {
                     Register scratch = sc.getRegister();
-                    int longSize = 8;
+                    int longSize = Long.BYTES;
                     masm.mov(64, scratch, sp);
                     AArch64Address address = AArch64Address.createImmediateAddress(64, AArch64Address.AddressingMode.IMMEDIATE_POST_INDEXED, scratch, longSize);
                     try (ScratchRegister sc2 = masm.getScratchRegister()) {
@@ -643,19 +632,56 @@ public class SubstrateAArch64Backend extends SubstrateBackend implements LIRGene
 
                 }
             }
-            crb.recordMark(PROLOGUE_DECD_RSP);
+
+            if (method.hasCalleeSavedRegisters()) {
+                VMError.guarantee(!method.isDeoptTarget(), "Deoptimization runtime cannot fill the callee saved registers");
+                AArch64CalleeSavedRegisters.singleton().emitSave(masm, totalFrameSize);
+            }
             crb.recordMark(PROLOGUE_END);
+        }
+
+        protected void makeFrame(CompilationResultBuilder crb, AArch64MacroAssembler masm, int totalFrameSize, int frameSize) {
+            boolean preserveFramePointer = ((SubstrateAArch64RegisterConfig) crb.frameMap.getRegisterConfig()).shouldPreserveFramePointer();
+            try (ScratchRegister sc = masm.getScratchRegister()) {
+                Register scratch = sc.getRegister();
+                assert totalFrameSize > 0;
+                AArch64Address.AddressingMode addressingMode = AArch64Address.AddressingMode.IMMEDIATE_PAIR_SIGNED_SCALED;
+                if (AArch64Address.isValidImmediateAddress(64, addressingMode, frameSize)) {
+                    masm.sub(64, sp, sp, totalFrameSize);
+                    masm.stp(64, fp, lr, AArch64Address.createImmediateAddress(64, addressingMode, sp, frameSize));
+                    if (preserveFramePointer) {
+                        masm.add(64, fp, sp, frameSize);
+                    }
+                } else {
+                    // frameRecordSize = 2 * wordSize (space for fp & lr)
+                    int frameRecordSize = totalFrameSize - frameSize;
+                    masm.stp(64, fp, lr, AArch64Address.createImmediateAddress(64, AArch64Address.AddressingMode.IMMEDIATE_PAIR_PRE_INDEXED, sp, -frameRecordSize));
+                    if (preserveFramePointer) {
+                        masm.mov(64, fp, sp);
+                    }
+                    masm.sub(64, sp, sp, frameSize, scratch);
+                }
+            }
         }
 
         @Override
         public void leave(CompilationResultBuilder crb) {
-            crb.recordMark(SubstrateMarkId.EPILOGUE_START);
-            AArch64MacroAssembler masm = (AArch64MacroAssembler) crb.asm;
             FrameMap frameMap = crb.frameMap;
-            int frameSize = frameMap.frameSize();
+            final int frameSize = frameMap.frameSize();
             final int totalFrameSize = frameMap.totalFrameSize();
+            AArch64MacroAssembler masm = (AArch64MacroAssembler) crb.asm;
 
             crb.blockComment("[method epilogue]");
+            crb.recordMark(SubstrateMarkId.EPILOGUE_START);
+            if (method.hasCalleeSavedRegisters()) {
+                JavaKind returnKind = method.getSignature().getReturnKind();
+                Register returnRegister = null;
+                if (returnKind != JavaKind.Void) {
+                    returnRegister = frameMap.getRegisterConfig().getReturnRegister(returnKind);
+                }
+                AArch64CalleeSavedRegisters.singleton().emitRestore(masm, totalFrameSize, returnRegister);
+            }
+
             try (ScratchRegister sc = masm.getScratchRegister()) {
                 int wordSize = crb.target.arch.getWordSize();
                 Register scratch = sc.getRegister();
@@ -670,6 +696,7 @@ public class SubstrateAArch64Backend extends SubstrateBackend implements LIRGene
                     masm.ldp(64, fp, lr, AArch64Address.createImmediateAddress(64, AArch64Address.AddressingMode.IMMEDIATE_PAIR_POST_INDEXED, sp, frameRecordSize));
                 }
             }
+
             crb.recordMark(SubstrateMarkId.EPILOGUE_INCD_RSP);
         }
 
@@ -684,33 +711,6 @@ public class SubstrateAArch64Backend extends SubstrateBackend implements LIRGene
         }
     }
 
-    static class AArch64StubCallingConventionSubstrateFrameContext extends SubstrateAArch64FrameContext {
-
-        private final JavaKind returnKind;
-
-        AArch64StubCallingConventionSubstrateFrameContext(JavaKind returnKind) {
-            this.returnKind = returnKind;
-        }
-
-        @Override
-        public void enter(CompilationResultBuilder crb) {
-            super.enter(crb);
-
-            AArch64CalleeSavedRegisters.singleton().emitSave((AArch64MacroAssembler) crb.asm, crb.frameMap.totalFrameSize());
-        }
-
-        @Override
-        public void leave(CompilationResultBuilder crb) {
-            Register returnRegister = null;
-            if (returnKind != JavaKind.Void) {
-                returnRegister = crb.frameMap.getRegisterConfig().getReturnRegister(returnKind);
-            }
-            AArch64CalleeSavedRegisters.singleton().emitRestore((AArch64MacroAssembler) crb.asm, crb.frameMap.totalFrameSize(), returnRegister);
-
-            super.leave(crb);
-        }
-    }
-
     /**
      * Generates the prolog of a {@link com.oracle.svm.core.deopt.Deoptimizer.StubType#EntryStub}
      * method.
@@ -718,7 +718,8 @@ public class SubstrateAArch64Backend extends SubstrateBackend implements LIRGene
     protected static class DeoptEntryStubContext extends SubstrateAArch64FrameContext {
         protected final CallingConvention callingConvention;
 
-        protected DeoptEntryStubContext(CallingConvention callingConvention) {
+        protected DeoptEntryStubContext(SharedMethod method, CallingConvention callingConvention) {
+            super(method);
             this.callingConvention = callingConvention;
         }
 
@@ -756,7 +757,8 @@ public class SubstrateAArch64Backend extends SubstrateBackend implements LIRGene
     protected static class DeoptExitStubContext extends SubstrateAArch64FrameContext {
         protected final CallingConvention callingConvention;
 
-        protected DeoptExitStubContext(CallingConvention callingConvention) {
+        protected DeoptExitStubContext(SharedMethod method, CallingConvention callingConvention) {
+            super(method);
             this.callingConvention = callingConvention;
         }
 
@@ -928,14 +930,11 @@ public class SubstrateAArch64Backend extends SubstrateBackend implements LIRGene
         CallingConvention callingConvention = lirGenResult.getCallingConvention();
         final FrameContext frameContext;
         if (stubType == Deoptimizer.StubType.EntryStub) {
-            frameContext = new DeoptEntryStubContext(callingConvention);
+            frameContext = new DeoptEntryStubContext(method, callingConvention);
         } else if (stubType == Deoptimizer.StubType.ExitStub) {
-            frameContext = new DeoptExitStubContext(callingConvention);
-        } else if (method.hasCalleeSavedRegisters()) {
-            VMError.guarantee(!method.isDeoptTarget(), "Deoptimization runtime cannot fill the callee saved registers");
-            frameContext = new AArch64StubCallingConventionSubstrateFrameContext(method.getSignature().getReturnKind());
+            frameContext = new DeoptExitStubContext(method, callingConvention);
         } else {
-            frameContext = new SubstrateAArch64FrameContext();
+            frameContext = createFrameContext(method);
         }
         LIR lir = lirGenResult.getLIR();
         OptionValues options = lir.getOptions();
@@ -945,6 +944,10 @@ public class SubstrateAArch64Backend extends SubstrateBackend implements LIRGene
                         uncompressedNullRegister);
         tasm.setTotalFrameSize(lirGenResult.getFrameMap().totalFrameSize());
         return tasm;
+    }
+
+    protected FrameContext createFrameContext(SharedMethod method) {
+        return new SubstrateAArch64FrameContext(method);
     }
 
     protected AArch64ArithmeticLIRGenerator createArithmeticLIRGen(AllocatableValue nullRegisterValue) {
