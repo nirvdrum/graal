@@ -116,7 +116,7 @@ public abstract class AbstractNativeImageClassLoaderSupport {
 
     public void setupHostedOptionParser(List<String> arguments) {
         hostedOptionParser = new HostedOptionParser(getClassLoader());
-        remainingArguments = Collections.unmodifiableList(Arrays.asList(hostedOptionParser.parse(arguments.toArray(new String[0]))));
+        remainingArguments = Collections.unmodifiableList((hostedOptionParser.parse(arguments)));
         parsedHostedOptions = new OptionValues(hostedOptionParser.getHostedValues());
         processClassLoaderOptions(parsedHostedOptions);
     }
