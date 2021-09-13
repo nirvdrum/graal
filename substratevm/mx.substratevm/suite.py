@@ -1082,7 +1082,7 @@ suite = {
                     "com.oracle.svm.hosted                        to java.base",
                     "com.oracle.svm.hosted.agent                  to java.instrument",
                     "com.oracle.svm.truffle.api                   to org.graalvm.truffle",
-                    "* to jdk.internal.vm.compiler,org.graalvm.nativeimage.driver,org.graalvm.nativeimage.configure,org.graalvm.nativeimage.librarysupport,org.graalvm.nativeimage.llvm,org.graalvm.nativeimage.agent.jvmtibase,org.graalvm.nativeimage.agent.tracing,org.graalvm.nativeimage.agent.diagnostics,com.oracle.svm.svm_enterprise",
+                    "* to jdk.internal.vm.compiler,org.graalvm.nativeimage.driver,org.graalvm.nativeimage.configure,org.graalvm.nativeimage.librarysupport,org.graalvm.nativeimage.junitsupport,org.graalvm.nativeimage.llvm,org.graalvm.nativeimage.agent.jvmtibase,org.graalvm.nativeimage.agent.tracing,org.graalvm.nativeimage.agent.diagnostics,com.oracle.svm.svm_enterprise",
                 ],
                 "opens" : [
                     "com.oracle.svm.core.nodes                    to jdk.internal.vm.compiler",
@@ -1171,11 +1171,6 @@ suite = {
                     "com.oracle.svm.jvmtiagentbase",
                     "com.oracle.svm.jvmtiagentbase.jvmti",
                 ],
-                "requires" : [
-                    "static com.oracle.mxtool.junit",
-                    "static junit",
-                    "static hamcrest",
-                ],
             },
         },
 
@@ -1183,26 +1178,42 @@ suite = {
             "subDir": "src",
             "description" : "SubstrateVM basic library-support components",
             "dependencies": [
-                "com.oracle.svm.junit",
                 "com.oracle.svm.polyglot",
                 "com.oracle.svm.thirdparty",
             ],
             "distDependencies": [
                 "sdk:GRAAL_SDK",
                 "SVM",
-                "OBJECTFILE",
+            ],
+            "moduleInfo" : {
+                "name" : "org.graalvm.nativeimage.librarysupport",
+                "exports" : [
+                    "* to org.graalvm.nativeimage.builder",
+                ],
+            },
+        },
+
+        "JUNIT_SUPPORT": {
+            "subDir": "src",
+            "description" : "SubstrateVM suppoprt for building JUnit test into image",
+            "dependencies": [
+                "com.oracle.svm.junit",
+            ],
+            "distDependencies": [
+                "sdk:GRAAL_SDK",
+                "SVM",
                 "compiler:GRAAL",
                 "mx:JUNIT_TOOL",
             ],
             "moduleInfo" : {
-                "name" : "org.graalvm.nativeimage.librarysupport",
+                "name" : "org.graalvm.nativeimage.junitsupport",
+                "exports" : [
+                    "* to org.graalvm.nativeimage.builder",
+                ],
                 "requires" : [
                     "static com.oracle.mxtool.junit",
                     "static junit",
                     "static hamcrest",
-                ],
-                "exports" : [
-                    "* to org.graalvm.nativeimage.builder",
                 ],
             },
         },
@@ -1301,9 +1312,6 @@ suite = {
                 "org.graalvm.nativeimage.builder",
                 "java.management",
                 "jdk.management",
-                "static com.oracle.mxtool.junit",
-                "static junit",
-                "static hamcrest",
               ],
             },
         },
@@ -1325,11 +1333,6 @@ suite = {
                 "name" : "org.graalvm.nativeimage.agent.tracing",
                 "exports" : [
                     "com.oracle.svm.agent",
-                ],
-                "requires" : [
-                    "static com.oracle.mxtool.junit",
-                    "static junit",
-                    "static hamcrest",
                 ],
                 "requiresConcealed" : {
                     "jdk.internal.vm.ci" : [
@@ -1355,11 +1358,6 @@ suite = {
                 "exports" : [
                     "com.oracle.svm.diagnosticsagent",
                 ],
-                "requires" : [
-                    "static com.oracle.mxtool.junit",
-                    "static junit",
-                    "static hamcrest",
-                ],
             },
         },
 
@@ -1379,11 +1377,6 @@ suite = {
                 "exports" : [
                     "* to org.graalvm.nativeimage.agent.tracing",
                     "com.oracle.svm.configure",
-                ],
-                "requires" : [
-                    "static com.oracle.mxtool.junit",
-                    "static junit",
-                    "static hamcrest",
                 ],
             },
         },
